@@ -1,11 +1,11 @@
 {
- "name": "Boulder Marker",
- "short_name": "Boulder",
+ "name": "PresaFacil",
+ "short_name": "PresaFacil",
  "start_url": "./",
  "scope": "./",
- "display": "fullscreen",
- "background_color": "#16161a",
- "theme_color": "#16161a",
+ "display": "standalone",
+ "background_color": "#222c36",
+ "theme_color": "#222c36",
  "icons": [
   {
    "src": "icon-192.png",
