@@ -127,7 +127,7 @@ snap();draw()};
 
 
 cv.onclick=e=>{if(!img)return;if(lpF){lpF=false;return}if(swallow){swallow=false;return}const r=cv.getBoundingClientRect(),p={x:(e.clientX-r.left)/r.width*PW,y:(e.clientY-r.top)/r.height*PH};
-const now=Date.now();
+const now=e.timeStamp;
 if(lastTap&&now-lastTap.t<320&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<28){lastTap=null;if(hi>0){hi--;restore()}walls=walls.concat(p);if(pend)run();snap();draw();toast("Muro marcado");return}
 lastTap={t:now,x:e.clientX,y:e.clientY};
 if(mode=="wall"){walls=walls.concat(p);if(pend)run()}
