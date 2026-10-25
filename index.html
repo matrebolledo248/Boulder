@@ -52,6 +52,11 @@ html,body{background:linear-gradient(165deg,#3a4d61,#1a232c) fixed}
 #lib{background:linear-gradient(165deg,#3a4d61,#1a232c)}
 #loading{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(20,28,36,.55);color:#fff;font-size:16px}
 #loading[hidden]{display:none}
+#dlg{position:fixed;inset:0;z-index:20;background:rgba(10,15,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
+.dc{background:var(--bar);color:var(--fg);border:1px solid var(--bd);border-radius:16px;padding:18px;width:min(340px,100%);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.dc p{margin:0 0 6px;line-height:1.4}.dc label{display:block;font-size:12px;opacity:.75;margin:10px 0 2px}
+.dc input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1.5px solid var(--bd);background:rgba(0,0,0,.25);color:var(--fg);font:inherit}
+.dc .row{justify-content:flex-end;margin-top:16px}
 </style></head><body>
 <div id="stage"><div id="zm"><canvas id="cv" width="10" height="10" hidden></canvas></div></div>
 <div id="empty">
@@ -196,7 +201,7 @@ pages.forEach(p=>{if(p.pend){p.items=p.items.concat({mask:p.pend.mask,cat:p.pend
 if(!pages.some(p=>p.items.length)){toast("No hay selecciones");return}
 const cur=pi;useState(pages[cur]);
 const old=curId?await tx("readonly",s=>s.get(curId)):null;
-const name=prompt("Nombre de la ruta",old?old.name:"");if(name===null)return;
+const nv=await dlg({msg:"Nombre de la ruta",fields:[{k:"n",label:"Nombre",value:old?old.name:""}],ok:"Guardar"});if(!nv)return;const name=nv.n;
 const out=[];let thumb=null;
 for(let i=0;i<pages.length;i++){useState(pages[i]);
 const pc=document.createElement("canvas");pc.width=CW;pc.height=CH;pc.getContext("2d").drawImage(img,0,0,CW,CH);
@@ -223,12 +228,12 @@ const ab=d.querySelector(".a"),lab=()=>ab.textContent="Intentos: "+r.attempts+" 
 d.querySelector("select").onchange=e=>{r.status=e.target.value;tx("readwrite",s=>s.put(r))};
 ab.onclick=()=>{r.attempts++;lab();tx("readwrite",s=>s.put(r))};
 d.querySelectorAll(".sh").forEach(b=>{b.classList.toggle("on",!!(r.shared&&r.shared[b.dataset.g]));b.onclick=()=>toggleShare(r,b.dataset.g,b)});
-d.querySelector(".x").onclick=async()=>{if(confirm("¿Borrar esta ruta?")){await tx("readwrite",s=>s.delete(r.id));openLib()}};
+d.querySelector(".x").onclick=async()=>{if(await dlg({msg:"¿Borrar esta ruta?",ok:"Borrar"})){await tx("readwrite",s=>s.delete(r.id));openLib()}};
 d.querySelector(".o").onclick=async()=>{L.style.display="none";history.replaceState({v:1},"");skipPush=true;restoring=true;const ps=r.pages||[{photo:r.photo,items:r.items}];
 for(let i=0;i<ps.length;i++)await loadSrc(URL.createObjectURL(ps[i].photo),async()=>{const its=[];for(const it of ps[i].items){const bm=await createImageBitmap(it.mask),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);its.push({mask:c,cat:it.cat})}items=its;pend=null;hist=[];hi=-1;snap();draw()},i>0);
 curId=r.id;goPage(0);restoring=false;schedDraft()};
 B.appendChild(d)})}
-$("saver").onclick=saveRoute;$("libbtn").onclick=openLib;$("libbtn2").onclick=openLib;$("libn").onclick=()=>{if(confirm("¿Empezar una ruta nueva? Lo no guardado se perderá."))newRoute()};$("libc").onclick=()=>history.back();
+$("saver").onclick=saveRoute;$("libbtn").onclick=openLib;$("libbtn2").onclick=openLib;$("libn").onclick=async()=>{if(await dlg({msg:"¿Empezar una ruta nueva? Lo no guardado se perderá.",ok:"Empezar"}))newRoute()};$("libc").onclick=()=>history.back();
 function segAuto(pts){const M=Math.max(PW,PH),F=[.03,.05,.08,.12,.18,.28,.4],r=[];
 const g=i=>(i in r)?r[i]:(r[i]=seg(pts,F[i]*M));
 let best=null;
@@ -250,15 +255,15 @@ const myToken=()=>{let t=null;try{t=localStorage.getItem("pf_tok")}catch(e){}if(
 async function rpc(fn,body){const c=CFG(),r=await fetch(c.url.replace(/\/$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"Content-Type":"application/json",apikey:c.key,Authorization:"Bearer "+c.key},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());const t=await r.text();return t?JSON.parse(t):null}
 const b2d=b=>new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)});
 const d2b=async u=>(await fetch(u)).blob();
-function setup(){const c=CFG(),ask=(m,k)=>{const v=prompt(m,c[k]||"");if(v===null)return false;c[k]=v.trim();return true};
-if(ask("URL de tu proyecto Supabase","url")&&ask("Clave anon public de Supabase","key")&&ask("Código de tu CLASE (mínimo 6 caracteres)","clase")&&ask("Código de tus AMIGOS (mínimo 6 caracteres)","amigos")&&ask("Tu nombre (lo verán los demás)","author")){setCFG(c);toast("Ajustes guardados");return true}return false}
+async function setup(){const c=CFG();const v=await dlg({msg:"Ajustes para compartir (Supabase)",fields:[{k:"url",label:"URL del proyecto Supabase",value:c.url},{k:"key",label:"Clave anon public",value:c.key},{k:"clase",label:"Código de tu clase (mínimo 6 caracteres)",value:c.clase},{k:"amigos",label:"Código de tus amigos (mínimo 6 caracteres)",value:c.amigos},{k:"author",label:"Tu nombre (lo verán los demás)",value:c.author}],ok:"Guardar"});
+if(!v)return false;for(const k in v)c[k]=v[k].trim();setCFG(c);toast("Ajustes guardados");return true}
 async function publish(r,code){const ps=r.pages||[{photo:r.photo,items:r.items}];
 const data={thumb:await b2d(r.thumb||ps[0].photo),pages:await Promise.all(ps.map(async p=>({photo:await b2d(p.photo),items:await Promise.all(p.items.map(async it=>({cat:it.cat,mask:await b2d(it.mask)})))})))};
 await rpc("publish_route",{p_code:code,p_token:myToken(),p_local:r.id,p_name:r.name,p_author:CFG().author||"",p_data:data})}
 function syncShared(r){const c=CFG();if(!r.shared||!c.url||!c.key)return;for(const g of ["amigos","clase"])if(r.shared[g]&&c[g])publish(r,c[g]).catch(()=>{})}
 async function toggleShare(r,g,btn){let c=CFG();
-if(!c.url||!c.key){if(!setup())return;c=CFG()}
-let code=c[g];if(!code||code.length<6){const v=prompt("Escribe el código de "+(g=="clase"?"tu clase":"tus amigos")+" (mínimo 6 caracteres)","");if(!v||v.trim().length<6){toast("Código demasiado corto");return}c[g]=code=v.trim();setCFG(c)}
+if(!c.url||!c.key){if(!(await setup()))return;c=CFG()}
+let code=c[g];if(!code||code.length<6){const nv=await dlg({msg:"Código de "+(g=="clase"?"tu clase":"tus amigos"),fields:[{k:"c",label:"Mínimo 6 caracteres",value:""}]});const v=nv&&nv.c;if(!v||v.trim().length<6){toast("Código demasiado corto");return}c[g]=code=v.trim();setCFG(c)}
 r.shared=r.shared||{};btn.disabled=true;
 try{if(r.shared[g]){await rpc("unpublish_route",{p_code:code,p_token:myToken(),p_local:r.id});r.shared[g]=false;toast("Dejaste de compartirla")}
 else{await publish(r,code);r.shared[g]=true;toast("Compartida con "+(g=="clase"?"tu clase":"tus amigos"))}
@@ -268,7 +273,7 @@ async function openData(data){const ps=await Promise.all(data.pages.map(async p=
 $("lib").style.display="none";history.replaceState({v:1},"");skipPush=true;restoring=true;
 for(let i=0;i<ps.length;i++)await loadSrc(URL.createObjectURL(ps[i].photo),async()=>{const its=[];for(const it of ps[i].items){const bm=await createImageBitmap(it.mask),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);its.push({mask:c,cat:it.cat})}items=its;pend=null;hist=[];hi=-1;snap();draw()},i>0);
 curId=null;goPage(0);restoring=false;schedDraft();toast("Pulsa 💾 para guardar una copia en tus rutas",3500)}
-async function openShared(){let c=CFG();if(!c.url||!c.key){if(!setup())return;c=CFG()}
+async function openShared(){let c=CFG();if(!c.url||!c.key){if(!(await setup()))return;c=CFG()}
 const B=$("libb"),gs=[["amigos","👥 Amigos"],["clase","🎓 Clase"]].filter(g=>c[g[0]]&&c[g[0]].length>=6);
 B.innerHTML='<div class="row"><button id="bk">← Mis rutas</button></div>';$("bk").onclick=openLib;
 if(!gs.length){B.insertAdjacentHTML("beforeend","<p>Configura tus códigos con el botón ⚙.</p>");return}
@@ -281,6 +286,13 @@ d.querySelector(".o").onclick=async()=>{try{await openData(await rpc("get_route"
 $("libg").onclick=openShared;$("libs").onclick=setup;
 addEventListener("error",e=>{if(e.message)toast("Error: "+e.message,4000)});
 addEventListener("unhandledrejection",e=>{const m=String(e.reason&&e.reason.message||e.reason);if(!/ServiceWorker/i.test(m))toast("Error: "+m,4000)});
+function dlg(o){return new Promise(res=>{const d=document.createElement("div");d.id="dlg";const c=document.createElement("div");c.className="dc";
+const m=document.createElement("p");m.textContent=o.msg;c.appendChild(m);const ins={};
+(o.fields||[]).forEach(f=>{const l=document.createElement("label");l.textContent=f.label;const i=document.createElement("input");i.type="text";i.value=f.value||"";i.autocapitalize="off";i.autocomplete="off";l.appendChild(i);c.appendChild(l);ins[f.k]=i});
+const r=document.createElement("div");r.className="row";const no=document.createElement("button"),ok=document.createElement("button");no.textContent=o.cancel||"Cancelar";ok.textContent=o.ok||"Aceptar";ok.className="on";
+const close=v=>{d.remove();res(v)};no.onclick=()=>close(null);
+ok.onclick=()=>{const v={};for(const k in ins)v[k]=ins[k].value;close(o.fields?v:true)};
+r.append(no,ok);c.appendChild(r);d.appendChild(c);document.body.appendChild(d);const f=Object.values(ins)[0];if(f)setTimeout(()=>{f.focus();f.select()},50)})}
 let skipPush=false,restoring=true,draftT=null;
 const bcache=new WeakMap(),cached=(o,mk)=>{if(!bcache.has(o))bcache.set(o,mk());return bcache.get(o)};
 const photoBlob=(im,w,h)=>cached(im,()=>{const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);return blobOf(c,"image/jpeg",.9)});
@@ -301,13 +313,14 @@ const mk=async b=>{const bm=await createImageBitmap(b),c=document.createElement(
 const its=[];for(const it of P.items)its.push({mask:await mk(it.mask),cat:it.cat,pts:it.pts||undefined});
 items=its;walls=P.walls||[];pend=P.pend?{pts:P.pend.pts,cat:P.pend.cat,mask:await mk(P.pend.mask)}:null;hist=[];hi=-1;snap();draw()},i>0)}
 curId=d.curId||null;goPage(Math.min(d.pi||0,pages.length-1));toast("Sesión restaurada")}catch(e){}finally{restoring=false}})();
-addEventListener("popstate",()=>{
+addEventListener("popstate",async()=>{
+const dg=$("dlg");if(dg){dg.querySelector("button").click();history.pushState({v:1},"");return}
 if($("lib").style.display=="flex"){$("lib").style.display="none";return}
 if($("ov").style.display=="flex"){$("ov").style.display="none";return}
 if(!document.body.classList.contains("has"))return;
 closeMenu();
 const work=items.length||pend||pages.some(p=>p&&p.items&&p.items.length);
-if(work&&!confirm("¿Salir de esta ruta? Lo que no hayas guardado se perderá.")){history.pushState({v:1},"");return}
+if(work&&!(await dlg({msg:"¿Salir de esta ruta? Lo que no hayas guardado se perderá.",ok:"Salir"}))){history.pushState({v:1},"");return}
 newRoute()});
 try{if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
 </script></body></html>
