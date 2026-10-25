@@ -18,6 +18,20 @@ body.has .fab{display:flex}
 canvas{max-width:100%;max-height:100%;touch-action:none}
 #empty{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:4}
 #empty[hidden]{display:none}
+#empty{background:linear-gradient(165deg,#3a4d61,#1a232c);color:#fff;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 20px) 24px calc(env(safe-area-inset-bottom,0px) + 20px);overflow:auto}
+#empty h1{margin:4px 0 0;font-size:30px;letter-spacing:.5px}
+#empty .sub{margin:0;opacity:.75;line-height:1.4}
+#empty .logo{border-radius:26px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+#empty .dots{display:flex;gap:8px;margin:2px 0 8px}
+#empty .dots i{width:10px;height:10px;border-radius:50%;display:block}
+#empty .big{width:min(300px,82vw);justify-content:center;padding:14px;font-size:16px;border-radius:14px;box-sizing:border-box}
+#empty .pri{background:#ff6a2b;border-color:#ff6a2b;color:#fff;font-weight:600;box-shadow:0 6px 18px rgba(255,106,43,.4)}
+#empty .sec{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.28);color:#fff}
+#empty .mut{margin-top:14px;font-size:13px;opacity:.55}
+#empty .row{justify-content:center;margin-top:0}
+#empty .ghost{background:transparent;border-color:rgba(255,255,255,.22);color:rgba(255,255,255,.8);font-size:13px;padding:6px 12px}
+#empty .tip{margin:10px 0 0;max-width:300px;font-size:12px;line-height:1.5;opacity:.5}
+
 .bar{background:var(--bar);border-top:1px solid var(--bd);padding:6px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
 button,.btn{font:inherit;color:var(--fg);background:var(--bar);border:1.5px solid var(--bd);border-radius:10px;padding:8px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .on{background:var(--on);color:var(--onfg);border-color:var(--on)}
@@ -35,7 +49,18 @@ button,.btn{font:inherit;color:var(--fg);background:var(--bar);border:1.5px soli
 input[type=range]{width:110px}
 </style></head><body>
 <div id="stage"><div id="zm"><canvas id="cv" width="10" height="10" hidden></canvas></div></div>
-<div id="empty"><p>Toma o sube una foto del muro</p><span class="btn on fl">📷 Cámara<input type="file" accept="image/*" capture="environment"></span> <span class="btn fl">🖼 Galería<input type="file" accept="image/*"></span><p><button id="libbtn2">📁 Mis rutas</button></p><p><button id="demo">Foto 1 (gimnasio oscuro)</button> <button id="demo2">Foto 2 (muro claro)</button></p></div>
+<div id="empty">
+<img src="icon-192.png" width="112" height="112" alt="" class="logo">
+<h1>PresaFacil</h1>
+<p class="sub">Marca las presas de tu ruta<br>con contornos luminosos</p>
+<div class="dots"><i style="background:#ff2d95"></i><i style="background:#2f7bff"></i><i style="background:#ffd60a"></i><i style="background:#22e05a"></i><i style="background:#ff8a00"></i><i style="background:#a855f7"></i></div>
+<span class="btn big pri fl">📷 Tomar foto<input type="file" accept="image/*" capture="environment"></span>
+<span class="btn big sec fl">🖼 Elegir de la galería<input type="file" accept="image/*"></span>
+<button id="libbtn2" class="big sec">📁 Mis rutas</button>
+<div class="mut">¿Solo quieres probar?</div>
+<div class="row"><button id="demo" class="ghost">Gimnasio oscuro</button><button id="demo2" class="ghost">Muro claro</button></div>
+<p class="tip">Toca una presa · arrastra ↔ para el tamaño, ↑ ＋ y ↓ － para corregir · mantén pulsado para elegir el tipo · doble toque en la pared para marcar muro</p>
+</div>
 <div id="toast"></div>
 <div class="fab top"><span class="btn fl" title="Cámara">📷<input type="file" accept="image/*" capture="environment"></span><span class="btn fl" title="Galería">🖼<input type="file" accept="image/*"></span><button id="undo" title="Deshacer">↶</button><button id="redo" title="Rehacer">↷</button><span id="tabs" style="display:contents"></span></div>
 <div class="fab bot"><button id="saver" title="Guardar ruta">💾</button><button id="libbtn" title="Mis rutas">📁</button><button id="save" title="Compartir" aria-label="Compartir"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg></button></div>
@@ -94,6 +119,7 @@ document.addEventListener("pointerdown",e=>{if($("menu")&&!e.target.closest("#me
 let lpT=null,lpF=false,lpX=0,lpY=0,G=null;
 function hit(m,x,y){x=Math.round(x);y=Math.round(y);return m.getContext("2d").getImageData(Math.max(0,x-3),Math.max(0,y-3),7,7).data.some((v,i)=>i%4==3&&v>0)}
 cv.addEventListener("contextmenu",e=>e.preventDefault());
+function prevSeg(g){const t=g.k==-1?pend:g.k>=0?items[g.k]:null;const pts=(g.k==-2||!t)?[{x:g.p.x,y:g.p.y,s:1}]:(t.pts||[{x:g.p.x,y:g.p.y,s:1}]);const m=seg(pts,g.R);if(m){g.pv=m;g.pvR=g.R}}
 const toP=(cx,cy)=>{const r=cv.getBoundingClientRect();return{x:(cx-r.left)/r.width*PW,y:(cy-r.top)/r.height*PH}};
 const tgtOf=k=>k>=-1?k:(pend?-1:(items.length?items.length-1:-2));
 cv.addEventListener("pointerdown",e=>{if(!img)return;lpF=false;G=null;lpX=e.clientX;lpY=e.clientY;clearTimeout(lpT);
@@ -103,7 +129,7 @@ G={k,p,cx:lpX,cy:lpY,R0:r0,R:r0,mode:null,menu:false};
 lpT=setTimeout(()=>{if(!G||G.mode)return;G.menu=true;if(navigator.vibrate)navigator.vibrate(40);showMenu(G.k,lpX,lpY,G.p,true);draw()},600)});
 cv.addEventListener("pointermove",e=>{if(G){const dx=e.clientX-G.cx,dy=e.clientY-G.cy;
 if(!G.mode&&Math.hypot(dx,dy)>16){G.mode=Math.abs(dx)>=Math.abs(dy)?"r":dy<0?"p":"m";clearTimeout(lpT);closeMenu();if(navigator.vibrate)navigator.vibrate(15)}
-if(G.mode=="r"){const M=Math.max(PW,PH);G.R=Math.min(.6*M,Math.max(.02*M,G.R0*Math.pow(2,dx/(innerWidth*.25))))}
+if(G.mode=="r"){const M=Math.max(PW,PH),st=M*.01;G.R=Math.round(Math.min(.6*M,Math.max(.02*M,G.R0*Math.pow(2,dx/(innerWidth*.25))))/st)*st;if(G.R!=G.pvR&&performance.now()-(G.last||0)>60){prevSeg(G);G.last=performance.now()}}
 if(G.mode)requestAnimationFrame(()=>draw());return}
 if(Math.hypot(e.clientX-lpX,e.clientY-lpY)>12)clearTimeout(lpT)});
 const endG=e=>{clearTimeout(lpT);if(!G)return;const g=G;G=null;
@@ -112,9 +138,9 @@ const fail=m=>{toast(m);draw()};
 if(!g.mode){if(g.menu){lpF=true;const mm=$("menu");if(mm)mm.style.pointerEvents="auto"}draw();return}
 lpF=true;
 if(g.mode=="r"){
-if(g.k==-2){const np={pts:[{x:g.p.x,y:g.p.y,s:1}],cat},m=seg(np.pts,g.R);if(!m)return fail("No se pudo con ese tamaño");
+if(g.k==-2){const np={pts:[{x:g.p.x,y:g.p.y,s:1}],cat},m=(g.pv&&g.pvR==g.R)?g.pv:seg(np.pts,g.R);if(!m)return fail("No se pudo con ese tamaño");
 if(pend)items=items.concat({mask:pend.mask,cat:pend.cat,pts:pend.pts});pend={...np,mask:m}}
-else{const t=g.k==-1?pend:items[g.k],pts=t.pts||[{x:g.p.x,y:g.p.y,s:1}],m=seg(pts,g.R);if(!m)return fail("No se pudo con ese tamaño");
+else{const t=g.k==-1?pend:items[g.k],pts=t.pts||[{x:g.p.x,y:g.p.y,s:1}],m=(g.pv&&g.pvR==g.R)?g.pv:seg(pts,g.R);if(!m)return fail("No se pudo con ese tamaño");
 if(g.k==-1)pend={...pend,mask:m,pts};else items=items.map((it,j)=>j==g.k?{...it,mask:m,pts}:it)}
 }else{
 const ti=tgtOf(g.k);if(ti==-2)return fail("Primero selecciona una presa");
@@ -141,8 +167,10 @@ t.globalCompositeOperation="destination-out";t.drawImage(m,0,0,CW,CH);
 t.globalCompositeOperation="source-in";t.fillStyle=col;t.fillRect(0,0,CW,CH);
 c.save();c.shadowColor=col;c.shadowBlur=th*3;c.drawImage(tc,0,0);c.drawImage(tc,0,0);c.restore()}
 function draw(exp){if(!img)return;ctx.drawImage(img,0,0,CW,CH);const th=Math.max(2.5,CW*.004*TK);
-items.forEach(it=>ring(ctx,it.mask,CATS[it.cat][1],th));
-if(pend&&pend.mask&&!exp)ring(ctx,pend.mask,CATS[pend.cat][1],th);
+const pv=!exp&&G&&G.mode=="r"&&G.pv;
+items.forEach((it,j)=>{if(pv&&G.k==j)return;ring(ctx,it.mask,CATS[it.cat][1],th)});
+if(pend&&pend.mask&&!exp&&!(pv&&G.k==-1))ring(ctx,pend.mask,CATS[pend.cat][1],th);
+if(pv)ring(ctx,G.pv,CATS[G.k>=0?items[G.k].cat:G.k==-1?pend.cat:cat][1],th);
 if(!exp){const k=CW/PW;if(pend)pend.pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x*k,p.y*k,th*1.6,0,6.3);ctx.fillStyle=p.s>0?"#fff":"#f33";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#000";ctx.stroke()});
 if(G&&G.mode){const k=CW/PW,x=G.p.x*k,y=G.p.y*k;ctx.beginPath();if(G.mode=="r"){ctx.arc(x,y,G.R*k,0,6.3);ctx.fillStyle="rgba(255,255,255,.2)"}else{ctx.arc(x,y,CW*.03,0,6.3);ctx.fillStyle=G.mode=="p"?"rgba(34,224,90,.6)":"rgba(255,60,60,.6)"}ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#fff";ctx.stroke();if(G.mode!="r"){ctx.fillStyle="#fff";ctx.font="bold "+Math.round(CW*.04)+"px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(G.mode=="p"?"+":"−",x,y)}}
 walls.forEach(p=>{ctx.fillStyle="rgba(0,255,255,.75)";ctx.fillRect(p.x*k-3,p.y*k-3,6,6)})}}
