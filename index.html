@@ -320,7 +320,7 @@ if($("ov").style.display=="flex"){$("ov").style.display="none";return}
 if(!document.body.classList.contains("has"))return;
 closeMenu();
 const work=items.length||pend||pages.some(p=>p&&p.items&&p.items.length);
-if(work&&!(await dlg({msg:"¿Salir de esta ruta? Lo que no hayas guardado se perderá.",ok:"Salir"}))){history.pushState({v:1},"");return}
+if(work){history.pushState({v:1},"");if(await dlg({msg:"¿Salir de esta ruta? Lo que no hayas guardado se perderá.",ok:"Salir"})){newRoute();history.back()}return}
 newRoute()});
 try{if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
 </script></body></html>
