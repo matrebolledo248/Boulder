@@ -106,7 +106,7 @@ if(cnt<6)return null;
 const cc=document.createElement("canvas");cc.width=PW;cc.height=PH;const id=new ImageData(w,h);for(let i=0;i<o.length;i++)if(o[i]){id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=255;id.data[i*4+3]=255}
 cc.getContext("2d").putImageData(id,x0,y0);cc.q=q;cc.R=R;cc.a=cnt;return cc}
 function run(){const m=segAuto(pend.pts);if(!m){toast("No se pudo, prueba otro punto");pend=null}else pend={...pend,mask:m}}
-function snap(){hist=hist.slice(0,hi+1);hist.push({items:items.slice(),pend,walls:walls.slice()});hi=hist.length-1}
+function snap(){hist=hist.slice(0,hi+1);hist.push({items:items.slice(),pend,walls:walls.slice()});hi=hist.length-1;schedDraft()}
 function restore(){const s=hist[hi];items=s.items.slice();pend=s.pend;walls=s.walls.slice();draw()}
 $("undo").onclick=()=>{if(hi>0){hi--;restore()}};$("redo").onclick=()=>{if(hi<hist.length-1){hi++;restore()}};
 function closeMenu(){const m=$("menu");if(m)m.remove()}
@@ -202,24 +202,24 @@ await tx("readwrite",s=>s.put(r));curId=r.id;toast("Ruta guardada ("+out.length+
 let pages=[],pi=0,lastTap=null;
 function stashPage(){if(img)pages[pi]={img,CW,CH,PW,PH,pix,grad,items,walls,pend,hist,hi}}
 function useState(p){({img,CW,CH,PW,PH,pix,grad,items,walls,pend,hist,hi}=p);cv.width=CW;cv.height=CH;tc=document.createElement("canvas");tc.width=CW;tc.height=CH;z=1;zx=zy=0;applyZ();draw()}
-function goPage(i){if(!pages[i]||(i==pi&&pages[pi]&&pages[pi].img===img))return;closeMenu();stashPage();pi=i;useState(pages[i]);renderTabs()}
+function goPage(i){if(!pages[i]||(i==pi&&pages[pi]&&pages[pi].img===img))return;closeMenu();stashPage();pi=i;useState(pages[i]);renderTabs();schedDraft()}
 function renderTabs(){const t=$("tabs");t.innerHTML="";if(pages.length<2)return;pages.forEach((_,i)=>{const b=document.createElement("button");b.textContent=i+1;b.className=i==pi?"on":"";b.onclick=()=>goPage(i);t.appendChild(b)})}
-function newRoute(){img=null;pages=[];pi=0;items=[];pend=null;walls=[];hist=[];hi=-1;curId=null;cv.hidden=true;$("empty").hidden=false;document.body.classList.remove("has");$("lib").style.display="none";renderTabs()}
+function newRoute(){img=null;pages=[];pi=0;items=[];pend=null;walls=[];hist=[];hi=-1;curId=null;cv.hidden=true;$("empty").hidden=false;document.body.classList.remove("has");$("lib").style.display="none";renderTabs();saveDraft()}
 const ST=["pendiente","intentada","encadenada"];
 async function openLib(){
 const L=$("lib"),B=$("libb");if(L.style.display!="flex")history.pushState({v:3},"");L.style.display="flex";
-const rs=((await tx("readonly",s=>s.getAll()))||[]).sort((a,b)=>b.created-a.created);
+const rs=((await tx("readonly",s=>s.getAll()))||[]).filter(r=>r.id!="__draft__").sort((a,b)=>b.created-a.created);
 B.innerHTML=rs.length?"":"<p>Aún no hay rutas guardadas.</p>";
-rs.forEach(r=>{const d=document.createElement("div");d.className="rt";const u=URL.createObjectURL(r.photo);
+rs.forEach(r=>{const d=document.createElement("div");d.className="rt";
 const tu=URL.createObjectURL(r.thumb||r.photo);d.innerHTML='<img src="'+tu+'" alt=""><div><b></b><div class="row"><select>'+ST.map(x=>"<option"+(x==r.status?" selected":"")+">"+x+"</option>").join("")+'</select><button class="a"></button></div><div class="row"><button class="o">Abrir</button><button class="x">Borrar</button></div></div>';
 d.querySelector("b").textContent=r.name+(r.pages&&r.pages.length>1?" ("+r.pages.length+" fotos)":"");
 const ab=d.querySelector(".a"),lab=()=>ab.textContent="Intentos: "+r.attempts+" ＋";lab();
 d.querySelector("select").onchange=e=>{r.status=e.target.value;tx("readwrite",s=>s.put(r))};
 ab.onclick=()=>{r.attempts++;lab();tx("readwrite",s=>s.put(r))};
 d.querySelector(".x").onclick=async()=>{if(confirm("¿Borrar esta ruta?")){await tx("readwrite",s=>s.delete(r.id));openLib()}};
-d.querySelector(".o").onclick=async()=>{L.style.display="none";history.replaceState({v:1},"");skipPush=true;const ps=r.pages||[{photo:r.photo,items:r.items}];
+d.querySelector(".o").onclick=async()=>{L.style.display="none";history.replaceState({v:1},"");skipPush=true;restoring=true;const ps=r.pages||[{photo:r.photo,items:r.items}];
 for(let i=0;i<ps.length;i++)await loadSrc(URL.createObjectURL(ps[i].photo),async()=>{const its=[];for(const it of ps[i].items){const bm=await createImageBitmap(it.mask),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);its.push({mask:c,cat:it.cat})}items=its;pend=null;hist=[];hi=-1;snap();draw()},i>0);
-curId=r.id;goPage(0)};
+curId=r.id;goPage(0);restoring=false;schedDraft()};
 B.appendChild(d)})}
 $("saver").onclick=saveRoute;$("libbtn").onclick=openLib;$("libbtn2").onclick=openLib;$("libn").onclick=()=>{if(confirm("¿Empezar una ruta nueva? Lo no guardado se perderá."))newRoute()};$("libc").onclick=()=>history.back();
 function segAuto(pts){const M=Math.max(PW,PH),F=[.03,.05,.08,.12,.18,.28,.4],r=[];
@@ -237,7 +237,26 @@ const[a,b]=[...ptrs.values()],r=stg.getBoundingClientRect(),d=Math.hypot(a.x-b.x
 z=Math.min(8,Math.max(1,P0.z*d/P0.d));const cx=(P0.mx-P0.zx)/P0.z,cy=(P0.my-P0.zy)/P0.z;zx=mx-cx*z;zy=my-cy*z;applyZ()},true);
 ["pointerup","pointercancel"].forEach(t=>stg.addEventListener(t,e=>{ptrs.delete(e.pointerId);if(pinching){e.stopPropagation();if(ptrs.size==0){pinching=false;P0=null}else if(ptrs.size==1)P0=null}},true));
 addEventListener("resize",applyZ);
-let skipPush=false;
+let skipPush=false,restoring=true,draftT=null;
+const bcache=new WeakMap(),cached=(o,mk)=>{if(!bcache.has(o))bcache.set(o,mk());return bcache.get(o)};
+const photoBlob=(im,w,h)=>cached(im,()=>{const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);return blobOf(c,"image/jpeg",.9)});
+const maskBlob=m=>cached(m,()=>blobOf(m,"image/png"));
+function schedDraft(){if(restoring)return;clearTimeout(draftT);draftT=setTimeout(saveDraft,600)}
+async function saveDraft(){if(restoring)return;clearTimeout(draftT);
+if(!img){await tx("readwrite",s=>s.delete("__draft__"));return}
+stashPage();
+const ps=await Promise.all(pages.map(async p=>({photo:await photoBlob(p.img,p.CW,p.CH),walls:p.walls,
+items:await Promise.all(p.items.map(async it=>({cat:it.cat,pts:it.pts||null,mask:await maskBlob(it.mask)}))),
+pend:p.pend&&p.pend.mask?{cat:p.pend.cat,pts:p.pend.pts,mask:await maskBlob(p.pend.mask)}:null})));
+await tx("readwrite",s=>s.put({id:"__draft__",curId,pi,pages:ps,created:Date.now()}))}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState=="hidden")saveDraft()});
+addEventListener("pagehide",()=>saveDraft());
+(async()=>{try{const d=await tx("readonly",s=>s.get("__draft__"));if(!d||!d.pages||!d.pages.length)return;
+for(let i=0;i<d.pages.length;i++){const P=d.pages[i];await loadSrc(URL.createObjectURL(P.photo),async()=>{
+const mk=async b=>{const bm=await createImageBitmap(b),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);return c};
+const its=[];for(const it of P.items)its.push({mask:await mk(it.mask),cat:it.cat,pts:it.pts||undefined});
+items=its;walls=P.walls||[];pend=P.pend?{pts:P.pend.pts,cat:P.pend.cat,mask:await mk(P.pend.mask)}:null;hist=[];hi=-1;snap();draw()},i>0)}
+curId=d.curId||null;goPage(Math.min(d.pi||0,pages.length-1));toast("Sesión restaurada")}catch(e){}finally{restoring=false}})();
 addEventListener("popstate",()=>{
 if($("lib").style.display=="flex"){$("lib").style.display="none";return}
 if($("ov").style.display=="flex"){$("ov").style.display="none";return}
