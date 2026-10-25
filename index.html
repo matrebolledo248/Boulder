@@ -54,7 +54,8 @@ html,body{background:linear-gradient(165deg,#3a4d61,#1a232c) fixed}
 #loading[hidden]{display:none}
 #dlg{position:fixed;inset:0;z-index:20;background:rgba(10,15,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
 .dc{background:var(--bar);color:var(--fg);border:1px solid var(--bd);border-radius:16px;padding:18px;width:min(340px,100%);box-shadow:0 10px 40px rgba(0,0,0,.5)}
-.dc p{margin:0 0 6px;line-height:1.4}.dc label{display:block;font-size:12px;opacity:.75;margin:10px 0 2px}
+.dc p{margin:0 0 6px;line-height:1.4;white-space:pre-line}
+.rt.ap{border-color:#22e05a;box-shadow:0 0 0 1px #22e05a inset}.dc label{display:block;font-size:12px;opacity:.75;margin:10px 0 2px}
 .dc input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1.5px solid var(--bd);background:rgba(0,0,0,.25);color:var(--fg);font:inherit}
 .dc .row{justify-content:flex-end;margin-top:16px}
 </style></head><body>
@@ -249,40 +250,64 @@ const[a,b]=[...ptrs.values()],r=stg.getBoundingClientRect(),d=Math.hypot(a.x-b.x
 z=Math.min(8,Math.max(1,P0.z*d/P0.d));const cx=(P0.mx-P0.zx)/P0.z,cy=(P0.my-P0.zy)/P0.z;zx=mx-cx*z;zy=my-cy*z;applyZ()},true);
 ["pointerup","pointercancel"].forEach(t=>stg.addEventListener(t,e=>{ptrs.delete(e.pointerId);if(pinching){e.stopPropagation();if(ptrs.size==0){pinching=false;P0=null}else if(ptrs.size==1)P0=null}},true));
 addEventListener("resize",applyZ);
-const CFG=()=>{try{return JSON.parse(localStorage.getItem("pf_cfg")||"{}")}catch(e){return{}}};
+const SB_URL="https://unufhiososzgijvuiymm.supabase.co",SB_KEY="sb_publishable_s0_nOiSDA5sFBJBh8gPjJw_j-6JDZzK";
+const CFG=()=>{let o={};try{o=JSON.parse(localStorage.getItem("pf_cfg")||"{}")}catch(e){}return Object.assign(o,{url:SB_URL,key:SB_KEY})};
 const setCFG=c=>{try{localStorage.setItem("pf_cfg",JSON.stringify(c))}catch(e){}};
 const myToken=()=>{let t=null;try{t=localStorage.getItem("pf_tok")}catch(e){}if(!t){t=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,"0")).join("");try{localStorage.setItem("pf_tok",t)}catch(e){}}return t};
-async function rpc(fn,body){const c=CFG(),r=await fetch(c.url.trim().replace(/\/rest\/v1\/?$/,"").replace(/\/$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers:Object.assign({"Content-Type":"application/json",apikey:c.key},c.key.startsWith("sb_")?{}:{Authorization:"Bearer "+c.key}),body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());const t=await r.text();return t?JSON.parse(t):null}
+async function rpc(fn,body){const c=CFG(),r=await fetch(c.url.trim().replace(/\/rest\/v1\/?$/,"").replace(/\/$/,"")+"/rest/v1/rpc/"+fn,{method:"POST",headers:Object.assign({"Content-Type":"application/json",apikey:c.key},c.key.startsWith("sb_")?{}:{Authorization:"Bearer "+c.key}),body:JSON.stringify(body)});
+if(!r.ok){let t=await r.text();try{t=JSON.parse(t).message||t}catch(e){}throw new Error(t)}const t=await r.text();return t?JSON.parse(t):null}
 const b2d=b=>new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)});
 const d2b=async u=>(await fetch(u)).blob();
-async function setup(){const c=CFG();const v=await dlg({msg:"Ajustes para compartir (Supabase)",fields:[{k:"url",label:"URL del proyecto Supabase",value:c.url},{k:"key",label:"Clave anon public",value:c.key},{k:"clase",label:"Código de tu clase (mínimo 6 caracteres)",value:c.clase},{k:"amigos",label:"Código de tus amigos (mínimo 6 caracteres)",value:c.amigos},{k:"author",label:"Tu nombre (lo verán los demás)",value:c.author}],ok:"Guardar"});
-if(!v)return false;for(const k in v)c[k]=v[k].trim();setCFG(c);toast("Ajustes guardados");return true}
-async function publish(r,code){const ps=r.pages||[{photo:r.photo,items:r.items}];
+const GL={clase:"🎓 Clase",amigos:"👥 Amigos"},RL={teacher:"Profesor",student:"Alumno",member:"Miembro"};
+const tcode=g=>g=="clase"?(CFG().profe||""):"";
+async function joinG(g){const c=CFG();if(!c[g]||c[g].length<6)throw new Error("Falta el código de "+(g=="clase"?"la clase":"amigos")+" (⚙)");
+const role=await rpc("join_group",{p_code:c[g],p_kind:g,p_teacher:tcode(g)});c.roles=c.roles||{};c.roles[g]=role;setCFG(c);return role}
+async function setup(){const c=CFG();const v=await dlg({msg:"Ajustes para compartir\nAlumnos: solo el código de la clase.\nProfesores: añadan también su código de profesor.",fields:[{k:"clase",label:"Código de la clase (mínimo 6 caracteres)",value:c.clase},{k:"profe",label:"Código de profesor (vacío si eres alumno)",value:c.profe},{k:"amigos",label:"Código de amigos (mínimo 6 caracteres)",value:c.amigos},{k:"author",label:"Tu nombre (lo verán los demás)",value:c.author}],ok:"Guardar"});
+if(!v)return false;for(const k in v)c[k]=v[k].trim();c.roles={};setCFG(c);
+const msgs=[];for(const g of ["clase","amigos"])if(c[g]){try{msgs.push(GL[g]+": "+RL[await joinG(g)])}catch(e){msgs.push(GL[g]+": "+e.message)}}
+toast(msgs.join(" · ")||"Ajustes guardados",5000);return true}
+async function publish(r,g){const c=CFG(),ps=r.pages||[{photo:r.photo,items:r.items}];
 const data={thumb:await b2d(r.thumb||ps[0].photo),pages:await Promise.all(ps.map(async p=>({photo:await b2d(p.photo),items:await Promise.all(p.items.map(async it=>({cat:it.cat,mask:await b2d(it.mask)})))})))};
-await rpc("publish_route",{p_code:code,p_token:myToken(),p_local:r.id,p_name:r.name,p_author:CFG().author||"",p_data:data})}
-function syncShared(r){const c=CFG();if(!r.shared||!c.url||!c.key)return;for(const g of ["amigos","clase"])if(r.shared[g]&&c[g])publish(r,c[g]).catch(()=>{})}
+await rpc("publish_route",{p_code:c[g],p_token:myToken(),p_local:r.id,p_name:r.name,p_author:c.author||"",p_data:data,p_teacher:tcode(g)})}
+function syncShared(r){if(!r.shared)return;for(const g of ["amigos","clase"])if(r.shared[g]&&CFG()[g])publish(r,g).catch(()=>{})}
 async function toggleShare(r,g,btn){let c=CFG();
-if(!c.url||!c.key){if(!(await setup()))return;c=CFG()}
-let code=c[g];if(!code||code.length<6){const nv=await dlg({msg:"Código de "+(g=="clase"?"tu clase":"tus amigos"),fields:[{k:"c",label:"Mínimo 6 caracteres",value:""}]});const v=nv&&nv.c;if(!v||v.trim().length<6){toast("Código demasiado corto");return}c[g]=code=v.trim();setCFG(c)}
+if(!c[g]||c[g].length<6){if(!(await setup()))return;c=CFG();if(!c[g]||c[g].length<6){toast("Falta el código de "+(g=="clase"?"la clase":"amigos"));return}}
 r.shared=r.shared||{};btn.disabled=true;
-try{if(r.shared[g]){await rpc("unpublish_route",{p_code:code,p_token:myToken(),p_local:r.id});r.shared[g]=false;toast("Dejaste de compartirla")}
-else{await publish(r,code);r.shared[g]=true;toast("Compartida con "+(g=="clase"?"tu clase":"tus amigos"))}
+try{if(r.shared[g]){await rpc("unpublish_route",{p_code:c[g],p_token:myToken(),p_local:r.id});r.shared[g]=false;toast("Dejaste de compartirla")}
+else{if(!(c.roles&&c.roles[g]))await joinG(g);await publish(r,g);r.shared[g]=true;toast("Compartida en "+GL[g])}
 await tx("readwrite",s=>s.put(r));btn.classList.toggle("on",!!r.shared[g])}
-catch(e){toast("Error: "+String(e.message).slice(0,90),3500)}finally{btn.disabled=false}}
+catch(e){toast("Error: "+String(e.message).slice(0,120),4000)}finally{btn.disabled=false}}
 async function openData(data){const ps=await Promise.all(data.pages.map(async p=>({photo:await d2b(p.photo),items:await Promise.all(p.items.map(async it=>({cat:it.cat,mask:await d2b(it.mask)})))})));
 $("lib").style.display="none";history.replaceState({v:1},"");skipPush=true;restoring=true;
 for(let i=0;i<ps.length;i++)await loadSrc(URL.createObjectURL(ps[i].photo),async()=>{const its=[];for(const it of ps[i].items){const bm=await createImageBitmap(it.mask),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);its.push({mask:c,cat:it.cat})}items=its;pend=null;hist=[];hi=-1;snap();draw()},i>0);
 curId=null;goPage(0);restoring=false;schedDraft();toast("Pulsa 💾 para guardar una copia en tus rutas",3500)}
-async function openShared(){let c=CFG();if(!c.url||!c.key){if(!(await setup()))return;c=CFG()}
-const B=$("libb"),gs=[["amigos","👥 Amigos"],["clase","🎓 Clase"]].filter(g=>c[g[0]]&&c[g[0]].length>=6);
-B.innerHTML='<div class="row"><button id="bk">← Mis rutas</button></div>';$("bk").onclick=openLib;
+async function showProgress(g,route,n){const c=CFG();try{const rows=await rpc("progress_all",{p_code:c[g],p_teacher:tcode(g),p_token:myToken()})||[],nm=r=>r.is_me?"Tú":(r.member_name||"Sin nombre");let msg;
+if(route){const l=rows.filter(r=>r.route_id==route.id);msg="Avance en «"+route.name+"»\n\n"+(l.length?l.map(r=>nm(r)+": "+r.status+" ("+r.attempts+" intentos)").join("\n"):"Nadie ha registrado avance todavía.")}
+else{const m={};rows.forEach(r=>{const o=m[nm(r)]||(m[nm(r)]={e:0,i:0});if(r.status=="encadenada")o.e++;else if(r.status=="intentada")o.i++});const ks=Object.keys(m);
+msg="Avance del grupo ("+n+" rutas)\n\n"+(ks.length?ks.map(k=>k+": "+m[k].e+" encadenadas, "+m[k].i+" intentadas").join("\n"):"Nadie ha registrado avance todavía.")}
+await dlg({msg,ok:"Cerrar",solo:true})}catch(e){toast("Error: "+e.message,4000)}}
+async function openShared(){let c=CFG();const B=$("libb");B.innerHTML='<div class="row"><button id="bk">← Mis rutas</button></div>';$("bk").onclick=openLib;
+const gs=["clase","amigos"].filter(g=>c[g]&&c[g].length>=6);
 if(!gs.length){B.insertAdjacentHTML("beforeend","<p>Configura tus códigos con el botón ⚙.</p>");return}
-for(const[g,lab]of gs){const h=document.createElement("h3");h.textContent=lab;B.appendChild(h);let rows=[];
-try{rows=await rpc("list_routes",{p_code:c[g]})||[]}catch(e){const p=document.createElement("p");p.textContent="No se pudo cargar.";B.appendChild(p);continue}
+for(const g of gs){let role=c.roles&&c.roles[g];const h=document.createElement("h3");h.textContent=GL[g];B.appendChild(h);let rows,mine={};
+try{if(!role)role=await joinG(g);c=CFG();rows=await rpc("list_routes",{p_code:c[g],p_token:myToken()})||[];(await rpc("my_progress",{p_code:c[g],p_token:myToken()})||[]).forEach(p=>mine[p.route_id]=p)}
+catch(e){const p=document.createElement("p");p.textContent="No se pudo cargar: "+e.message;B.appendChild(p);continue}
+h.textContent=GL[g]+" · "+RL[role];const isT=role=="teacher",canSee=isT||g=="amigos";
+if(canSee){const w=document.createElement("div"),b=document.createElement("button");w.className="row";b.textContent="📊 Avance del grupo";b.onclick=()=>showProgress(g,null,rows.length);w.appendChild(b);B.appendChild(w)}
 if(!rows.length){const p=document.createElement("p");p.textContent="Sin rutas todavía.";B.appendChild(p)}
-rows.forEach(x=>{const d=document.createElement("div");d.className="rt";d.innerHTML='<img alt=""><div><b></b><div class="row"><span class="au"></span></div><div class="row"><button class="o">Abrir</button></div></div>';
-d.querySelector("img").src=x.thumb||"";d.querySelector("b").textContent=x.name;d.querySelector(".au").textContent=x.author?"por "+x.author:"";
-d.querySelector(".o").onclick=async()=>{try{await openData(await rpc("get_route",{p_code:c[g],p_id:x.id}))}catch(e){toast("No se pudo abrir")}};B.appendChild(d)})}}
+rows.forEach(x=>{const d=document.createElement("div");d.className="rt"+(x.approved?" ap":"");
+d.innerHTML='<img alt=""><div><b></b><div class="row"><span class="au"></span></div><div class="row"><select></select><button class="a"></button></div><div class="row act"><button class="o">Abrir</button></div></div>';
+d.querySelector("img").src=x.thumb||"";d.querySelector("b").textContent=(x.approved?"✔ ":"")+x.name;
+d.querySelector(".au").textContent=(x.approved?"Vista en clase · ":"")+(x.author?"por "+x.author:"");
+const pr=mine[x.id]||{status:"pendiente",attempts:0},sel=d.querySelector("select"),ab=d.querySelector(".a"),act=d.querySelector(".act");
+ST.forEach(s=>{const o=document.createElement("option");o.textContent=s;o.selected=s==pr.status;sel.appendChild(o)});
+const lab=()=>ab.textContent="Intentos: "+pr.attempts+" ＋";lab();
+const save=()=>rpc("set_progress",{p_code:c[g],p_token:myToken(),p_name:c.author||"",p_route:x.id,p_status:pr.status,p_attempts:pr.attempts}).then(()=>toast("Avance guardado",1000),e=>toast("Error: "+e.message,3500));
+sel.onchange=()=>{pr.status=sel.value;save()};ab.onclick=()=>{pr.attempts++;if(pr.status=="pendiente"){pr.status="intentada";sel.value="intentada"}lab();save()};
+d.querySelector(".o").onclick=async()=>{try{await openData(await rpc("get_route",{p_code:c[g],p_id:x.id}))}catch(e){toast("No se pudo abrir")}};
+if(canSee){const b=document.createElement("button");b.textContent="👥 Avance";b.onclick=()=>showProgress(g,x,rows.length);act.appendChild(b)}
+if(isT){const b=document.createElement("button");b.textContent=x.approved?"Quitar ✔":"✔ Aprobar";b.onclick=async()=>{try{await rpc("set_approved",{p_code:c[g],p_teacher:tcode(g),p_id:x.id,p_val:!x.approved});openShared()}catch(e){toast("Error: "+e.message,3500)}};act.appendChild(b)}
+B.appendChild(d)})}}
 $("libg").onclick=openShared;$("libs").onclick=setup;
 addEventListener("error",e=>{if(e.message)toast("Error: "+e.message,4000)});
 addEventListener("unhandledrejection",e=>{const m=String(e.reason&&e.reason.message||e.reason);if(!/ServiceWorker/i.test(m))toast("Error: "+m,4000)});
@@ -292,7 +317,7 @@ const m=document.createElement("p");m.textContent=o.msg;c.appendChild(m);const i
 const r=document.createElement("div");r.className="row";const no=document.createElement("button"),ok=document.createElement("button");no.textContent=o.cancel||"Cancelar";ok.textContent=o.ok||"Aceptar";ok.className="on";
 const close=v=>{d.remove();res(v)};no.onclick=()=>close(null);
 ok.onclick=()=>{const v={};for(const k in ins)v[k]=ins[k].value;close(o.fields?v:true)};
-r.append(no,ok);c.appendChild(r);d.appendChild(c);document.body.appendChild(d);const f=Object.values(ins)[0];if(f)setTimeout(()=>{f.focus();f.select()},50)})}
+r.append(...(o.solo?[ok]:[no,ok]));c.appendChild(r);d.appendChild(c);document.body.appendChild(d);const f=Object.values(ins)[0];if(f)setTimeout(()=>{f.focus();f.select()},50)})}
 let skipPush=false,restoring=true,draftT=null;
 const bcache=new WeakMap(),cached=(o,mk)=>{if(!bcache.has(o))bcache.set(o,mk());return bcache.get(o)};
 const photoBlob=(im,w,h)=>cached(im,()=>{const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);return blobOf(c,"image/jpeg",.9)});
