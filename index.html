@@ -53,7 +53,7 @@ html,body{background:linear-gradient(165deg,#3a4d61,#1a232c) fixed}
 #loading{position:fixed;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;background:rgba(20,28,36,.55);color:#fff;font-size:16px}
 #loading[hidden]{display:none}
 #dlg{position:fixed;inset:0;z-index:20;background:rgba(10,15,20,.6);display:flex;align-items:center;justify-content:center;padding:20px}
-.dc{background:var(--bar);color:var(--fg);border:1px solid var(--bd);border-radius:16px;padding:18px;width:min(340px,100%);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.dc{max-height:88vh;overflow:auto;background:var(--bar);color:var(--fg);border:1px solid var(--bd);border-radius:16px;padding:18px;width:min(340px,100%);box-shadow:0 10px 40px rgba(0,0,0,.5)}
 .dc p{margin:0 0 6px;line-height:1.4;white-space:pre-line}
 .rt.ap{border-color:#22e05a;box-shadow:0 0 0 1px #22e05a inset}.dc label{display:block;font-size:12px;opacity:.75;margin:10px 0 2px}
 .dc input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1.5px solid var(--bd);background:rgba(0,0,0,.25);color:var(--fg);font:inherit}
@@ -228,7 +228,7 @@ const pc=document.createElement("canvas");pc.width=CW;pc.height=CH;pc.getContext
 if(i==0){TK=2.5;draw(true);const tcv=document.createElement("canvas"),ts=300/Math.max(CW,CH);tcv.width=Math.round(CW*ts);tcv.height=Math.round(CH*ts);tcv.getContext("2d").drawImage(cv,0,0,tcv.width,tcv.height);thumb=await blobOf(tcv,"image/jpeg",.8);TK=1}
 out.push({photo:await blobOf(pc,"image/jpeg",.85),items:await Promise.all(pages[i].items.map(async it=>({cat:it.cat,mask:await blobOf(it.mask,"image/png")})))})}
 useState(pages[cur]);renderTabs();
-const r={id:curId||("r"+Date.now()),name:name||"Ruta",created:old?old.created:Date.now(),status:old?old.status:"pendiente",attempts:old?old.attempts:0,thumb,pages:out,shared:old?old.shared:undefined};
+const r={id:curId||("r"+Date.now()),name:name||"Ruta",created:old?old.created:Date.now(),status:old?old.status:"pendiente",attempts:old?old.attempts:0,thumb,pages:out,shared:old?old.shared:undefined,targets:old?old.targets:undefined};
 await tx("readwrite",s=>s.put(r));curId=r.id;syncShared(r);hideLoading();toast("Ruta guardada ("+out.length+(out.length>1?" fotos)":" foto)"))}
 let pages=[],pi=0,lastTap=null;
 function stashPage(){if(img)pages[pi]={img,base,CW,CH,PW,PH,pix,grad,items,walls,pend,hist,hi}}
@@ -244,13 +244,14 @@ if(libTab!="mine"){B.innerHTML=LOADING;return libTab=="clase"?renderClasses():re
 const rs=((await tx("readonly",s=>s.getAll()))||[]).filter(r=>r.id!="__draft__").sort((a,b)=>b.created-a.created);
 B.innerHTML=rs.length?"":"<p>Aún no hay rutas guardadas.</p>";
 rs.forEach(r=>{const d=document.createElement("div");d.className="rt";
-const tu=URL.createObjectURL(r.thumb||r.photo);d.innerHTML='<img src="'+tu+'" alt=""><div><b></b><div class="row"><select>'+ST.map(x=>"<option"+(x==r.status?" selected":"")+">"+x+"</option>").join("")+'</select><button class="am">−</button><span class="n"></span><button class="a">＋</button></div><div class="row"><button class="o">Abrir</button><button class="x">Borrar</button></div></div>';
+const tu=URL.createObjectURL(r.thumb||r.photo);d.innerHTML='<img src="'+tu+'" alt=""><div><b></b><div class="row"><select>'+ST.map(x=>"<option"+(x==r.status?" selected":"")+">"+x+"</option>").join("")+'</select><button class="am">−</button><span class="n"></span><button class="a">＋</button></div><div class="row"><button class="o">Abrir</button><button class="shr"></button><button class="x">Borrar</button></div></div>';
 d.querySelector("b").textContent=r.name+(r.pages&&r.pages.length>1?" ("+r.pages.length+" fotos)":"");
 const ab=d.querySelector(".a"),am=d.querySelector(".am"),nn=d.querySelector(".n"),lab=()=>nn.textContent="Intentos: "+r.attempts;lab();am.onclick=()=>{if(r.attempts>0){r.attempts--;lab();tx("readwrite",s=>s.put(r))}};
 d.querySelector("select").onchange=e=>{r.status=e.target.value;tx("readwrite",s=>s.put(r))};
 ab.onclick=()=>{r.attempts++;lab();tx("readwrite",s=>s.put(r))};
 d.querySelectorAll(".sh").forEach(b=>{b.classList.toggle("on",!!(r.shared&&r.shared[b.dataset.g]));b.onclick=()=>toggleShare(r,b.dataset.g,b)});
-d.querySelector(".x").onclick=async()=>{if(await dlg({msg:"¿Borrar esta ruta?",ok:"Borrar"})){await tx("readwrite",s=>s.delete(r.id));openLib()}};
+const sb=d.querySelector(".shr");sb.textContent=(r.targets&&(r.targets.cls||(r.targets.friends||[]).length))?"Compartida ✓":"Compartir…";sb.onclick=()=>shareRoute(r);
+d.querySelector(".x").onclick=async()=>{if(await dlg({msg:"¿Borrar esta ruta?",ok:"Borrar"})){if(r.targets)try{await rpc("route_delete",{p_token:myToken(),p_local:r.id})}catch(e){}await tx("readwrite",s=>s.delete(r.id));openLib()}};
 d.querySelector(".o").onclick=async()=>{showLoading("Abriendo ruta…");L.style.display="none";history.replaceState({v:1},"");skipPush=true;restoring=true;const ps=r.pages||[{photo:r.photo,items:r.items}];
 for(let i=0;i<ps.length;i++)await loadSrc(URL.createObjectURL(ps[i].photo),async()=>{const its=[];for(const it of ps[i].items){const bm=await createImageBitmap(it.mask),c=document.createElement("canvas");c.width=PW;c.height=PH;c.getContext("2d").drawImage(bm,0,0);its.push({mask:c,cat:it.cat})}items=its;pend=null;hist=[];hi=-1;snap();draw()},i>0);
 curId=r.id;goPage(0);restoring=false;schedDraft();hideLoading()};
@@ -290,7 +291,7 @@ toast(msgs.join(" · ")||"Ajustes guardados",5000);return true}
 async function publish(r,g){const c=CFG(),ps=r.pages||[{photo:r.photo,items:r.items}];
 const data={thumb:await b2d(r.thumb||ps[0].photo),pages:await Promise.all(ps.map(async p=>({photo:await b2d(p.photo),items:await Promise.all(p.items.map(async it=>({cat:it.cat,mask:await b2d(it.mask)})))})))};
 await rpc("publish_route",{p_code:c[g],p_token:myToken(),p_local:r.id,p_name:r.name,p_author:c.author||"",p_data:data,p_teacher:tcode(g)})}
-function syncShared(r){if(!r.shared)return;for(const g of ["amigos","clase"])if(r.shared[g]&&CFG()[g])publish(r,g).catch(()=>{})}
+function syncShared(r){if(r.targets&&(r.targets.cls||(r.targets.friends||[]).length))publishRoute(r,r.targets).catch(()=>{});return;if(!r.shared)return;for(const g of ["amigos","clase"])if(r.shared[g]&&CFG()[g])publish(r,g).catch(()=>{})}
 async function toggleShare(r,g,btn){let c=CFG();
 if(!c[g]||c[g].length<6){if(!(await setup()))return;c=CFG();if(!c[g]||c[g].length<6){toast("Falta el código de "+(g=="clase"?"la clase":"amigos"));return}}
 r.shared=r.shared||{};btn.disabled=true;showLoading(r.shared[g]?"Quitando…":"Subiendo ruta…");
@@ -387,7 +388,7 @@ catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message))}}
 let curCls=null;
 async function openClsd(c){curCls=c;history.pushState({v:8},"");$("clsdt").textContent=c.name;$("clsd").hidden=false;loadClsd()}
 async function loadClsd(){const c=curCls,B=$("clsdb");B.innerHTML=LOADING;
-try{const ms=await rpc("teacher_class_members",qs({p_class:c.id}))||[];B.innerHTML="";
+try{const ms=await rpc("teacher_class_members",qs({p_class:c.id}))||[],rts=await rpc("teacher_class_routes",qs({p_class:c.id}))||[];B.innerHTML="";
 const top=mk("div","",null,"box");top.append(mk("b","Código: "+c.code),mk("button","Copiar código",()=>copyText(c.code).then(g=>toast(g?"Código copiado":"No se pudo copiar",2000))),
 mk("button","Regenerar código",async()=>{if(!(await dlg({msg:"¿Generar un código nuevo? El anterior dejará de servir para nuevas solicitudes. Los alumnos ya aceptados siguen dentro.",ok:"Regenerar"})))return;try{const r=await rpc("teacher_regen_class_code",qs({p_class:c.id}));c.code=r.code;await dlg({msg:"Nuevo código:\n"+r.code,copy:r.code,ok:"Listo",solo:true});loadClsd()}catch(e){toast(e.message,4000)}}),
 mk("button","Eliminar clase",async()=>{if(!(await dlg({msg:"¿Eliminar la clase «"+c.name+"»? Se quitarán todos los alumnos.",ok:"Eliminar"})))return;try{await rpc("teacher_delete_class",qs({p_class:c.id}));history.back();setTimeout(loadCls,300)}catch(e){toast(e.message,4000)}}));B.appendChild(top);
@@ -398,20 +399,55 @@ pend.forEach(m=>{const d=mk("div","",null,"box");d.append(mk("b",m.name),mk("div
 B.appendChild(mk("h3","Alumnos ("+act2.length+" de 60)"));if(!act2.length)B.appendChild(mk("p","Aún no hay alumnos aceptados.",null,"mut2"));
 act2.forEach(m=>{const d=mk("div","",null,"box");d.append(mk("b",m.name),mk("div","",null,"row"));
 d.lastChild.append(mk("button","Renombrar",async()=>{const v=await dlg({msg:"Nuevo nombre para "+m.name,fields:[{k:"n",label:"Nombre",value:m.name}],ok:"Guardar"});if(!v||!v.n.trim())return;try{await rpc("teacher_rename_member",qs({p_member:m.id,p_name:v.n.trim()}));loadClsd()}catch(e){toast(e.message,4000)}}),
-mk("button","Quitar",async()=>{if(await dlg({msg:"¿Quitar a "+m.name+" de la clase? Conserva en su teléfono lo que ya había abierto.",ok:"Quitar"}))act(m,"remove")}));B.appendChild(d)})}
+mk("button","Quitar",async()=>{if(await dlg({msg:"¿Quitar a "+m.name+" de la clase? Conserva en su teléfono lo que ya había abierto.",ok:"Quitar"}))act(m,"remove")}));B.appendChild(d)});
+B.appendChild(mk("h3","Rutas de la clase ("+rts.length+")"));if(!rts.length)B.appendChild(mk("p","Aún no hay rutas en esta clase.",null,"mut2"));
+rts.forEach(x=>{x.group_name=c.name;const ap=mk("button",x.approved?"Quitar ✔":"✔ Aprobar",async()=>{try{await rpc("route_approve",qs({p_route:x.route_id,p_val:!x.approved}));loadClsd()}catch(e){toast(e.message,4000)}}),
+rm=mk("button","Retirar",async()=>{if(await dlg({msg:"¿Retirar «"+x.name+"» de la clase? Desaparece de los teléfonos de tus alumnos.",ok:"Retirar"})){try{await rpc("route_remove_from_class",qs({p_route:x.route_id}));loadClsd()}catch(e){toast(e.message,4000)}}});
+B.appendChild(routeCard(x,"clase",c.id,[ap,rm]))})}
 catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message))}}
 async function joinClass(){let msg="Unirme a una clase",code="",name=(CFG().author||"");
 for(;;){const v=await dlg({msg,fields:[{k:"c",label:"Código de la clase",value:code},{k:"n",label:"Tu nombre o apodo",value:name}],ok:"Pedir acceso"});if(!v)return;code=v.c.trim();name=v.n.trim();
 try{const r=await rpc("join_class",{p_code:code,p_token:myToken(),p_name:name});const c=CFG();c.author=name;setCFG(c);renderProfBtn();toast(r.status=="active"?"Ya estás en «"+r.class_name+"»":"Solicitud enviada. Espera a que el profe te acepte",4500);renderClasses();return}
 catch(e){msg=e.message}}}
-async function renderClasses(){const B=$("libb");B.innerHTML=LOADING;let list=[];
-try{list=await rpc("my_classes",{p_token:myToken()})||[]}catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message));return}
+async function renderClasses(){const B=$("libb");B.innerHTML=LOADING;let list=[],feed=[];
+try{[list,feed]=await Promise.all([rpc("my_classes",{p_token:myToken()}),rpc("routes_feed",{p_token:myToken()})]);list=list||[];feed=feed||[]}catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message));return}
 B.innerHTML="";B.appendChild(mk("button","＋ Unirme a una clase",joinClass,"on"));
 if(!list.length)B.appendChild(mk("p","Aún no estás en ninguna clase. Pide el código a tu profe."));
-list.forEach(c=>{const d=mk("div","",null,"box");d.append(mk("b",c.class_name),mk("div","Profe: "+c.teacher_name+" · Tú: "+c.my_name,null,"mut2"));
+list.forEach(c=>{const d=mk("div","",null,"box"),o=ori("clase",c.class_id);d.append(mk("b",o[0]+" "+c.class_name),mk("div","Profe: "+c.teacher_name+" · Tú: "+c.my_name,null,"mut2"));
 if(c.status=="pending")d.append(mk("div","Esperando que el profe te acepte",null,"mut2"),mk("button","Cancelar solicitud",async()=>{try{await rpc("leave_class",{p_token:myToken(),p_class:c.class_id});renderClasses()}catch(e){toast(e.message,4000)}}));
-else d.append(mk("div","Las rutas de la clase aparecerán aquí en el bloque 1d.",null,"mut2"),mk("button","Salir de la clase",async()=>{if(await dlg({msg:"¿Salir de «"+c.class_name+"»?",ok:"Salir"})){try{await rpc("leave_class",{p_token:myToken(),p_class:c.class_id});renderClasses()}catch(e){toast(e.message,4000)}}}));
+else{const cr=feed.filter(x=>x.kind=="clase"&&x.group_id==c.class_id);if(!cr.length)d.append(mk("div","Aún no hay rutas en esta clase.",null,"mut2"));cr.forEach(x=>d.appendChild(routeCard(x,"clase",c.class_id)));
+d.append(mk("button","Salir de la clase",async()=>{if(await dlg({msg:"¿Salir de «"+c.class_name+"»?",ok:"Salir"})){try{await rpc("leave_class",{p_token:myToken(),p_class:c.class_id});renderClasses()}catch(e){toast(e.message,4000)}}}))}
 B.appendChild(d)})}
+const CP=[["▲","#5aa9ff"],["■","#2dd4bf"],["●","#fbbf24"],["★","#fb7185"]],FP=["◆","#c084fc"];
+const ori=(kind,gid)=>kind=="amigos"?FP:CP[parseInt(String(gid).replace(/-/g,"").slice(0,4),16)%CP.length];
+const spc=()=>(SP()||{}).code||"";
+async function openRoute(x){await openData(rpc("route_get",{p_token:myToken(),p_special:spc(),p_route:x.route_id}))}
+function routeCard(x,kind,gid,acts){const o=ori(kind,gid),d=mk("div","",null,"rt");d.style.cssText="border:2px "+(kind=="clase"&&!x.approved?"dashed ":"solid ")+o[1]+";background:"+o[1]+"22";
+const im=document.createElement("img");im.alt="";if(x.thumb)im.src=x.thumb;d.appendChild(im);
+const c=mk("div");c.appendChild(mk("b",o[0]+" "+(x.approved&&kind=="clase"?"✔ ":"")+x.name));
+c.appendChild(mk("div",(kind=="clase"?(x.approved?"Aprobada · ":"Sin aprobar · "):"")+(x.author?"por "+x.author+" · ":"")+(x.group_name||""),null,"mut2"));
+const r=mk("div","",null,"row");r.appendChild(mk("button","Abrir",()=>openRoute(x).catch(e=>toast(e.message,4000)),"on"));(acts||[]).forEach(a=>r.appendChild(a));c.appendChild(r);d.appendChild(c);return d}
+async function publishRoute(r,t){const ps=r.pages||[{photo:r.photo,items:r.items}];
+const data={pages:await Promise.all(ps.map(async p=>({photo:await b2d(p.photo),items:await Promise.all(p.items.map(async it=>({cat:it.cat,mask:await b2d(it.mask)})))})))};
+const th=await b2d(r.thumb||ps[0].photo);
+return rpc("route_publish",{p_token:myToken(),p_special:spc(),p_local:r.id,p_name:r.name,p_author:CFG().author||"",p_thumb:th,p_data:data,p_class:t.cls||null,p_friends:t.friends||[]})}
+function shareDialog(r,o,t){return new Promise(res=>{const d=document.createElement("div");d.id="dlg";const c=mk("div","",null,"dc");c.appendChild(mk("p","Compartir «"+r.name+"»"));
+let cls=t.cls||null;const fr=new Set(t.friends||[]);
+c.appendChild(mk("div","Clase (solo una)",null,"mut2"));const cb=mk("div");c.appendChild(cb);
+c.appendChild(mk("div","Grupos de amigos",null,"mut2"));const fb=mk("div");c.appendChild(fb);
+c.appendChild(mk("div","Con una clase elegida, solo puedes sumar grupos de amigos formados por gente de esa misma clase.",null,"mut2"));
+const dr=()=>{cb.innerHTML="";[{id:null,name:"Ninguna"}].concat(o.classes).forEach(k=>{const l=mk("label","",null,"fld row"),i=document.createElement("input");i.type="radio";i.name="cls";i.checked=(cls||null)==k.id;
+i.onchange=()=>{cls=k.id;for(const g of [...fr]){const f=o.friends.find(x=>x.id==g);if(cls&&f&&!f.ok_classes.includes(cls))fr.delete(g)}dr()};l.append(i,k.name+(k.teacher?" · "+k.teacher:""));cb.appendChild(l)});
+fb.innerHTML="";if(!o.friends.length)fb.appendChild(mk("div","No estás en ningún grupo de amigos.",null,"mut2"));
+o.friends.forEach(f=>{const dis=!!cls&&!f.ok_classes.includes(cls),l=mk("label","",null,"fld row"),i=document.createElement("input");i.type="checkbox";i.checked=fr.has(f.id)&&!dis;i.disabled=dis;i.onchange=()=>{i.checked?fr.add(f.id):fr.delete(f.id)};l.append(i,f.name+(dis?" (incluye gente que no es de la clase)":""));fb.appendChild(l)})};
+dr();const row=mk("div","",null,"row");row.append(mk("button","Cancelar",()=>{d.remove();res(null)}),mk("button","Compartir",()=>{d.remove();res({cls:cls,friends:[...fr]})},"on"));c.appendChild(row);d.appendChild(c);document.body.appendChild(d)})}
+async function shareRoute(r){showLoading("Cargando opciones…");let o;
+try{o=await rpc("my_share_options",{p_token:myToken(),p_special:spc()})}catch(e){hideLoading();toast(e.message,4000);return}hideLoading();
+if(!o.classes.length&&!o.friends.length){toast("Primero únete a una clase o a un grupo de amigos",4500);return}
+const sel=await shareDialog(r,o,r.targets||{});if(!sel)return;const any=sel.cls||sel.friends.length;
+showLoading(any?"Subiendo ruta…":"Quitando ruta…");
+try{if(any)await publishRoute(r,sel);else await rpc("route_delete",{p_token:myToken(),p_local:r.id});r.targets=any?sel:undefined;await tx("readwrite",s=>s.put(r));toast(any?"Ruta compartida":"Ruta dejó de compartirse",2500)}
+catch(e){toast(e.message,5000)}finally{hideLoading()}openLib()}
 $("clsc").onclick=()=>history.back();$("clsdc").onclick=()=>history.back();
 const LOADING='<div class="ld"><div class="spin"></div><span>Cargando…</span></div>';
 let loadTm=null;
@@ -430,19 +466,19 @@ async function showMembers(g){try{const ms=await rpc("friends_members",{p_token:
 async function renameMe(g){let msg="Tu nombre en «"+g.name+"»",nm=g.my_name;
 for(;;){const v=await dlg({msg,fields:[{k:"n",label:"Nombre o apodo",value:nm}],ok:"Guardar"});if(!v)return;nm=v.n.trim();
 try{await rpc("friends_rename_me",{p_token:myToken(),p_group:g.id,p_name:nm});renderFriends();return}catch(e){msg=e.message}}}
-async function renderFriends(){const B=$("libb");B.innerHTML=LOADING;let list=[];
-try{list=await rpc("my_friends",{p_token:myToken()})||[]}catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message));return}
+async function renderFriends(){const B=$("libb");B.innerHTML=LOADING;let list=[],feed=[];
+try{[list,feed]=await Promise.all([rpc("my_friends",{p_token:myToken()}),rpc("routes_feed",{p_token:myToken()})]);list=list||[];feed=feed||[]}catch(e){B.innerHTML="";B.appendChild(mk("p","No se pudo cargar: "+e.message));return}
 B.innerHTML="";const r=mk("div","",null,"row");r.append(mk("button","＋ Crear grupo",createFriends,"on"),mk("button","Unirme con código",joinFriends));B.appendChild(r);
 B.appendChild(mk("div",list.length+" de 5 grupos",null,"mut2"));
 if(!list.length)B.appendChild(mk("p","Aún no estás en ningún grupo de amigos."));
 const run=async f=>{try{await f();renderFriends()}catch(e){toast(e.message,4000)}};
-list.forEach(g=>{const d=mk("div","",null,"box");d.append(mk("b",g.name),mk("div",g.members+" de 30 miembros · Tú: "+g.my_name+" · Código: "+g.code,null,"mut2"));
+list.forEach(g=>{const d=mk("div","",null,"box");d.append(mk("b","◆ "+g.name),mk("div",g.members+" de 30 miembros · Tú: "+g.my_name+" · Código: "+g.code,null,"mut2"));
 const a=mk("div","",null,"row");a.append(mk("button","Copiar código",()=>copyText(g.code).then(ok=>toast(ok?"Código copiado":"No se pudo copiar",2000))),mk("button","Miembros",()=>showMembers(g)),mk("button","Mi nombre",()=>renameMe(g)));d.appendChild(a);
 const b=mk("div","",null,"row");
 if(g.is_owner)b.append(mk("button","Regenerar código",async()=>{if(!(await dlg({msg:"¿Generar un código nuevo? El anterior dejará de servir para nuevas personas.",ok:"Regenerar"})))return;run(async()=>{const x=await rpc("friends_regen_code",{p_token:myToken(),p_group:g.id});await dlg({msg:"Nuevo código:\n"+x.code,copy:x.code,ok:"Listo",solo:true})})}),
 mk("button","Eliminar grupo",async()=>{if(await dlg({msg:"¿Eliminar «"+g.name+"» para todos?",ok:"Eliminar"}))run(()=>rpc("friends_delete",{p_token:myToken(),p_group:g.id}))}));
 b.append(mk("button","Salir",async()=>{if(await dlg({msg:"¿Salir de «"+g.name+"»?",ok:"Salir"}))run(()=>rpc("leave_friends",{p_token:myToken(),p_group:g.id}))}));
-d.appendChild(b);B.appendChild(d)})}
+d.appendChild(b);const fr=feed.filter(x=>x.kind=="amigos"&&x.group_id==g.id);if(!fr.length)d.appendChild(mk("div","Aún no hay rutas en este grupo.",null,"mut2"));fr.forEach(x=>d.appendChild(routeCard(x,"amigos",g.id)));B.appendChild(d)})}
 let libTab="mine";
 let skipPush=false,restoring=true,draftT=null;
 const bcache=new WeakMap(),cached=(o,mk)=>{if(!bcache.has(o))bcache.set(o,mk());return bcache.get(o)};
